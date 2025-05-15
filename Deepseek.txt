@@ -1,0 +1,156 @@
+# Programa para automatizar búsquedas y descargas de adjuntos en Hotmail
+
+```python
+import imaplib
+import email
+import os
+from email.header import decode_header
+import getpass
+
+def descargar_adjuntos_hotmail(username, password, carpeta_descarga, buscar_asunto=None, buscar_remitente=None):
+    """
+    Función para buscar y descargar adjuntos de emails en Hotmail/Outlook
+    
+    Args:
+        username (str): Correo electrónico del usuario
+        password (str): Contraseña del correo
+        carpeta_descarga (str): Ruta donde guardar los adjuntos
+        buscar_asunto (str, optional): Texto a buscar en el asunto. Defaults to None.
+        buscar_remitente (str, optional): Remitente a buscar. Defaults to None.
+    """
+    
+    # Crear la carpeta de descarga si no existe
+    if not os.path.exists(carpeta_descarga):
+        os.makedirs(carpeta_descarga)
+    
+    try:
+        # Conectar al servidor IMAP de Outlook
+        mail = imaplib.IMAP4_SSL("outlook.office365.com")
+        mail.login(username, password)
+        
+        # Seleccionar la bandeja de entrada
+        mail.select("inbox")
+        
+        # Construir criterio de búsqueda
+        criterio = "ALL"  # Por defecto busca todos
+        if buscar_asunto and buscar_remitente:
+            criterio = f'(FROM "{buscar_remitente}" SUBJECT "{buscar_asunto}")'
+        elif buscar_asunto:
+            criterio = f'(SUBJECT "{buscar_asunto}")'
+        elif buscar_remitente:
+            criterio = f'(FROM "{buscar_remitente}")'
+        
+        # Buscar emails según criterio
+        status, mensajes = mail.search(None, criterio)
+        if status != "OK":
+            print("Error al buscar emails")
+            return
+        
+        # Convertir los IDs de mensajes a lista
+        ids_mensajes = mensajes[0].split()
+        if not ids_mensajes:
+            print("No se encontraron mensajes con los criterios especificados")
+            return
+        
+        print(f"Se encontraron {len(ids_mensajes)} mensajes")
+        
+        # Procesar cada mensaje
+        for id_mensaje in ids_mensajes:
+            # Obtener el mensaje
+            status, datos = mail.fetch(id_mensaje, "(RFC822)")
+            if status != "OK":
+                print(f"Error al obtener mensaje {id_mensaje}")
+                continue
+            
+            # Parsear el mensaje
+            mensaje = email.message_from_bytes(datos[0][1])
+            
+            # Decodificar asunto
+            asunto, encoding = decode_header(mensaje["Subject"])[0]
+            if isinstance(asunto, bytes):
+                asunto = asunto.decode(encoding or "utf-8")
+            
+            # Decodificar remitente
+            remitente, encoding = decode_header(mensaje.get("From"))[0]
+            if isinstance(remitente, bytes):
+                remitente = remitente.decode(encoding or "utf-8")
+            
+            print(f"\nProcesando mensaje - Asunto: {asunto}, Remitente: {remitente}")
+            
+            # Procesar adjuntos
+            for part in mensaje.walk():
+                if part.get_content_maintype() == "multipart":
+                    continue
+                
+                if part.get("Content-Disposition") is None:
+                    continue
+                
+                nombre_archivo = part.get_filename()
+                if nombre_archivo:
+                    # Decodificar el nombre del archivo si es necesario
+                    nombre_archivo, encoding = decode_header(nombre_archivo)[0]
+                    if isinstance(nombre_archivo, bytes):
+                        nombre_archivo = nombre_archivo.decode(encoding or "utf-8")
+                    
+                    # Guardar el adjunto
+                    ruta_archivo = os.path.join(carpeta_descarga, nombre_archivo)
+                    with open(ruta_archivo, "wb") as f:
+                        f.write(part.get_payload(decode=True))
+                    print(f"Descargado adjunto: {nombre_archivo}")
+        
+        # Cerrar conexión
+        mail.close()
+        mail.logout()
+        print("\nProceso completado")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+if __name__ == "__main__":
+    print("Automatizador de descarga de adjuntos de Hotmail/Outlook")
+    
+    # Solicitar credenciales
+    username = input("Ingrese su email (Hotmail/Outlook): ")
+    password = getpass.getpass("Ingrese su contraseña: ")
+    
+    # Configuración
+    carpeta_descarga = input("Ingrese la carpeta para guardar adjuntos (deje vacío para 'adjuntos'): ") or "adjuntos"
+    buscar_asunto = input("Buscar en asunto (deje vacío para ignorar): ") or None
+    buscar_remitente = input("Buscar remitente (deje vacío para ignorar): ") or None
+    
+    # Ejecutar la descarga
+    descargar_adjuntos_hotmail(username, password, carpeta_descarga, buscar_asunto, buscar_remitente)
+```
+
+## Instrucciones de uso:
+
+1. **Requisitos previos**:
+   - Tener Python instalado (3.6 o superior)
+   - No se requieren librerías adicionales (usa módulos estándar)
+
+2. **Cómo ejecutar**:
+   - Guarda el código en un archivo `.py` (por ejemplo, `descargar_adjuntos.py`)
+   - Ejecútalo con `python descargar_adjuntos.py`
+   - Sigue las instrucciones que aparecen en pantalla
+
+3. **Características**:
+   - Permite buscar emails por asunto, remitente o ambos
+   - Descarga todos los adjuntos de los emails que coincidan con la búsqueda
+   - Crea automáticamente la carpeta de destino si no existe
+   - Muestra información sobre el progreso del proceso
+
+4. **Seguridad**:
+   - La contraseña se solicita de forma segura (no se muestra en pantalla)
+   - Usa conexión SSL segura con el servidor
+
+5. **Notas**:
+   - Para que funcione, debes tener habilitado IMAP en tu cuenta de Hotmail/Outlook
+   - Si usas autenticación de dos factores, necesitarás crear una contraseña de aplicación
+
+## Personalización:
+
+Puedes modificar el script para:
+- Buscar en otras carpetas además de la bandeja de entrada
+- Filtrar por fecha de recepción
+- Procesar solo ciertos tipos de archivos
+- Automatizar el proceso con parámetros fijos (sin entrada interactiva)
