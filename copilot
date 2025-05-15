@@ -1,0 +1,43 @@
+Automatizar la búsqueda y descarga de adjuntos en correos de Hotmail con Python es totalmente factible. Puedes hacerlo mediante la biblioteca imaplib para acceder a los correos vía IMAP y email para procesarlos. Aquí tienes un ejemplo básico:
+
+import imaplib
+import email
+import os
+
+# Configuración
+EMAIL = "tu_correo@hotmail.com"
+PASSWORD = "tu_contraseña"
+IMAP_SERVER = "outlook.office365.com"
+
+# Conexión al servidor IMAP
+mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+mail.login(EMAIL, PASSWORD)
+mail.select("inbox")
+
+# Buscar correos con adjuntos
+result, data = mail.search(None, 'ALL')
+email_ids = data[0].split()
+
+for email_id in email_ids:
+    result, msg_data = mail.fetch(email_id, '(RFC822)')
+    raw_email = msg_data[0][1]
+    msg = email.message_from_bytes(raw_email)
+
+    if msg.get_content_maintype() == "multipart":
+        for part in msg.walk():
+            if part.get_content_maintype() == "multipart":
+                continue
+            if part.get("Content-Disposition") is None:
+                continue
+            
+            filename = part.get_filename()
+            if filename:
+                filepath = os.path.join("descargas", filename)
+                with open(filepath, "wb") as f:
+                    f.write(part.get_payload(decode=True))
+                print(f"Adjunto guardado: {filename}")
+
+# Cerrar conexión
+mail.logout()
+
+Este script conecta tu cuenta de Hotmail vía IMAP, busca correos con adjuntos y los guarda en la carpeta descargas. Solo falta agregar manejo de excepciones y filtrado avanzado según criterios específicos (como asunto o remitente). ¿Quieres que te ayude a personalizarlo más? 🚀
