@@ -1,0 +1,124 @@
+#### **Automatización de búsquedas y descargas de adjuntos en correos de Hotmail con Python**
+
+A continuación, te presento un programa en Python que utiliza las bibliotecas `imaplib` y `email` para automatizar la búsqueda de correos electrónicos en una cuenta de Hotmail y descargar los archivos adjuntos. Este script se conecta al servidor IMAP de Hotmail, busca correos no leídos, y descarga los adjuntos en una carpeta específica.
+
+---
+
+#### **Código Python**
+
+```python
+import imaplib
+import email
+import os
+
+# Configuración del servidor IMAP de Hotmail
+IMAP_SERVER = 'outlook.office365.com'
+IMAP_PORT = 993
+EMAIL_ACCOUNT = 'tu_correo@hotmail.com'
+EMAIL_PASSWORD = 'tu_contraseña'
+
+# Carpeta donde se guardarán los adjuntos
+ATTACHMENTS_FOLDER = './adjuntos'
+
+# Crear la carpeta de adjuntos si no existe
+if not os.path.exists(ATTACHMENTS_FOLDER):
+    os.makedirs(ATTACHMENTS_FOLDER)
+
+def descargar_adjuntos():
+    try:
+        # Conexión al servidor IMAP
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+        mail.select('inbox')  # Seleccionar la bandeja de entrada
+
+        # Buscar correos no leídos
+        status, mensajes = mail.search(None, '(UNSEEN)')
+        if status != 'OK':
+            print("No se pudieron buscar los correos.")
+            return
+
+        # Procesar cada correo no leído
+        for num in mensajes[0].split():
+            status, datos = mail.fetch(num, '(RFC822)')
+            if status != 'OK':
+                print(f"Error al obtener el correo {num}")
+                continue
+
+            # Leer el contenido del correo
+            for respuesta in datos:
+                if isinstance(respuesta, tuple):
+                    mensaje = email.message_from_bytes(respuesta[1])
+                    asunto = mensaje['subject']
+                    remitente = mensaje['from']
+                    print(f"Procesando correo de: {remitente}, Asunto: {asunto}")
+
+                    # Descargar adjuntos si existen
+                    if mensaje.is_multipart():
+                        for parte in mensaje.walk():
+                            if parte.get_content_disposition() == 'attachment':
+                                nombre_archivo = parte.get_filename()
+                                if nombre_archivo:
+                                    ruta_archivo = os.path.join(ATTACHMENTS_FOLDER, nombre_archivo)
+                                    with open(ruta_archivo, 'wb') as archivo:
+                                        archivo.write(parte.get_payload(decode=True))
+                                    print(f"Adjunto descargado: {nombre_archivo}")
+
+        # Cerrar la conexión
+        mail.logout()
+        print("Proceso completado.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Ejecutar la función
+descargar_adjuntos()
+```
+
+---
+
+#### **Explicación del Código**
+
+1. **Configuración del servidor IMAP**:
+   - Se utiliza el servidor IMAP de Hotmail (`outlook.office365.com`) y el puerto 993 para conexiones seguras.
+
+2. **Autenticación**:
+   - Se inicia sesión con las credenciales de tu cuenta de Hotmail.
+
+3. **Búsqueda de correos no leídos**:
+   - Se buscan correos no leídos en la bandeja de entrada utilizando el comando IMAP `(UNSEEN)`.
+
+4. **Procesamiento de correos**:
+   - Para cada correo no leído, se analiza su contenido y se buscan partes con archivos adjuntos.
+
+5. **Descarga de adjuntos**:
+   - Los archivos adjuntos se descargan en una carpeta específica (`./adjuntos`).
+
+6. **Manejo de errores**:
+   - Se incluyen bloques `try-except` para manejar posibles errores durante la conexión o el procesamiento.
+
+---
+
+#### **Requisitos Previos**
+
+1. **Instalar Python**:
+   - Asegúrate de tener Python 3 instalado en tu sistema.
+
+2. **Bibliotecas necesarias**:
+   - Este script utiliza bibliotecas estándar de Python (`imaplib`, `email`, `os`), por lo que no necesitas instalar paquetes adicionales.
+
+3. **Permisos en tu cuenta de Hotmail**:
+   - Activa el acceso IMAP en tu cuenta de Hotmail y asegúrate de que las credenciales sean correctas.
+
+---
+
+#### **Notas Importantes**
+
+- **Seguridad**:
+  - No compartas tus credenciales en texto plano. Considera usar un archivo de configuración o variables de entorno para almacenarlas de forma segura.
+
+- **Manejo de adjuntos**:
+  - Este script descarga todos los adjuntos sin filtrar. Si necesitas descargar solo ciertos tipos de archivos (por ejemplo, `.pdf`), puedes agregar una validación en el nombre del archivo.
+
+- **Pruebas**:
+  - Realiza pruebas con correos de prueba antes de usar el script en tu cuenta principal.
+
+¡Espero que este programa te sea útil para automatizar tus tareas con correos electrónicos! 😊
